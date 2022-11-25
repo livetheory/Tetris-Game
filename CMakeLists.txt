@@ -8,9 +8,7 @@ add_executable(
     TetrisGame 
 
     src/main.cpp
-    src/util.cpp
-
-    src/include/util.hpp
+    src/game.cpp
 )
 
 target_link_libraries(${PROJECT_NAME} SDL2 SDL2_ttf)
