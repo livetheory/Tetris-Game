@@ -1,14 +1,13 @@
 
-#include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <vector>
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 
-#define TILE            30
-#define VERTICAL_GRID   20
-#define HORIZONTAL_GRID 10
+// #include "include/game.hpp"
+#include "include/util.hpp"
 
 void SetUpGame();
 void ProceesInput();
@@ -19,14 +18,19 @@ void ClearLine();
 bool CheckBottomBorder();
 bool CheckHorizontalBorder(int move);
 
-bool GameLoop;
-int  TetrominoCoord[] = {5, -2};
-bool TetrominoCoveredGrid[10][20] = {false};
-
+int score = 0;
 SDL_Event event;
 SDL_Rect Grid[10][20];
+SDL_Rect scoreTextRect;
+
+TTF_Font *font;
+SDL_Surface *scoreTextSurface;
+SDL_Texture *scoreTextTexture;
+SDL_Renderer *GameRenderer;
+
 
 int Tetromino[4][2];
+int NextTetromino[4][2];
 int Tetrominos[7][4][2] = {
     {{-2, 0}, {-1, 0}, { 0, 0}, { 1, 0}},
     {{ 0,-1}, {-1,-1}, {-1, 0}, { 0, 0}},
@@ -40,17 +44,32 @@ int Tetrominos[7][4][2] = {
 int main(int argc, char *argv[]) {
     srand(time(0));
 
+    TTF_Init();
     SDL_Init(SDL_INIT_EVERYTHING);
-    SDL_Window *GameWindow = SDL_CreateWindow("Tetris Game", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, TILE * HORIZONTAL_GRID * 3, (TILE * VERTICAL_GRID), 0);
-    SDL_Renderer *GameRenderer = SDL_CreateRenderer(GameWindow, -1, SDL_RENDERER_ACCELERATED);
+    SDL_Window *GameWindow = SDL_CreateWindow("Tetris Game", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, (TILE * HORIZONTAL_GRID * 2.4), (TILE * VERTICAL_GRID), 0);
+    GameRenderer = SDL_CreateRenderer(GameWindow, -1, SDL_RENDERER_ACCELERATED);
 
+    font = TTF_OpenFont("../fonts/UbuntuMono-Regular.ttf", 64);
+    if (!font) std::cout << "Failed to load font: " << TTF_GetError() << std::endl;
+
+    SDL_Surface* titleTextSurface = TTF_RenderText_Solid(font, "Tetris Game", {255, 255, 255});
+    SDL_Texture* titleTextTexture = SDL_CreateTextureFromSurface(GameRenderer, titleTextSurface);
+
+    scoreTextSurface = TTF_RenderText_Solid(font, ("SCORE - " + std::to_string(score)).c_str(), {255, 255, 255});
+    scoreTextTexture = SDL_CreateTextureFromSurface(GameRenderer, scoreTextSurface);
+
+    SDL_Rect titleTextRect = {320, 20, titleTextSurface->w, titleTextSurface->h};
+    SDL_FreeSurface(titleTextSurface);
+
+    scoreTextRect = {320, 500, scoreTextSurface->w, scoreTextSurface->h};
+    SDL_FreeSurface(scoreTextSurface);
+  
     SetUpGame(); 
     while (GameLoop) {
         SDL_RenderClear(GameRenderer);
-        while (SDL_PollEvent(&event)) {
-            ProceesInput();
-        }
+        while (SDL_PollEvent(&event)) ProceesInput();
 
+        // Draw Grid
         SDL_SetRenderDrawColor(GameRenderer, 200, 200, 200, 255);
         for (int i = 0; i < HORIZONTAL_GRID; i++) {
             for (int j = 0; j < VERTICAL_GRID; j++) {
@@ -58,93 +77,88 @@ int main(int argc, char *argv[]) {
             }
         }
         
-
+        // Draw Already Dropped Tetrominos
         SDL_SetRenderDrawColor(GameRenderer, 255, 255, 0, 255);
         for (int x = 0; x < 10; x++) {
             for (int y = 0; y < 20; y++) {
                 if (TetrominoCoveredGrid[x][y]) {
-                    SDL_Rect rect;
-                    rect.x = TILE * x;
-                    rect.y = TILE * y;
-                    rect.w = TILE - 1;
-                    rect.h = TILE - 1;
+                    SDL_Rect rect = {TILE * x, TILE * y, TILE - 1, TILE - 1};
                     SDL_RenderFillRect(GameRenderer, &rect);
                 }
             }
         }
 
+        // Draw Dropping Tetromino
         SDL_SetRenderDrawColor(GameRenderer, 0, 255, 0, 255);
         for (int i = 0; i < 4; i++) {
-            SDL_Rect rect;
+            SDL_Rect rect = {0, 0, TILE - 1, TILE - 1};
             rect.x = (Tetromino[i][0] * TILE) + (TetrominoCoord[0] * TILE);
             rect.y = (Tetromino[i][1] * TILE) + (TetrominoCoord[1] * TILE);
-            rect.w = TILE - 1;
-            rect.h = TILE - 1;
+            SDL_RenderFillRect(GameRenderer, &rect);
+        }
+
+        // Draw Next Tetromino
+        SDL_SetRenderDrawColor(GameRenderer, 255, 255, 0, 255);
+        for (int i = 0; i < 4; i++) {
+            SDL_Rect rect = {0, 0, TILE - 1, TILE - 1};
+            rect.x = (NextTetromino[i][0] * TILE) + 15 * TILE;
+            rect.y = (NextTetromino[i][1] * TILE) + 5  * TILE;
             SDL_RenderFillRect(GameRenderer, &rect);
         }
 
         SDL_SetRenderDrawColor(GameRenderer, 0, 0, 0, 255);
+        SDL_RenderCopy(GameRenderer, titleTextTexture, NULL, &titleTextRect);
+        SDL_RenderCopy(GameRenderer, scoreTextTexture, NULL, &scoreTextRect);
         SDL_RenderPresent(GameRenderer);
         SDL_Delay(200);
 
         UpdateGame();
     }
 
+    TTF_CloseFont(font);
+    SDL_DestroyTexture(titleTextTexture);
     SDL_DestroyRenderer(GameRenderer);
     SDL_DestroyWindow(GameWindow);
+    	
+    TTF_Quit();
     SDL_Quit();
 
     return 0;
 }
 
 void ProceesInput() {
-    if (event.type == SDL_QUIT) 
-        GameLoop = false;
+    if (event.type == SDL_QUIT) GameLoop = false;
 
     else if (event.type == SDL_KEYDOWN) {
         if (event.key.keysym.sym == SDLK_ESCAPE) GameLoop = false;
-
+        else if (event.key.keysym.sym == SDLK_DOWN) GetTetrominoDown();
+        else if (event.key.keysym.sym == SDLK_UP || event.key.keysym.sym == SDLK_SPACE) RotateTetromino();
+        
         else if (event.key.keysym.sym == SDLK_RIGHT) {
             if (CheckHorizontalBorder(1)) TetrominoCoord[0]++;
         } 
-        
         else if (event.key.keysym.sym == SDLK_LEFT) {
             if (CheckHorizontalBorder(-1)) TetrominoCoord[0]--;
         } 
-        
-        else if (event.key.keysym.sym == SDLK_DOWN) {
-            GetTetrominoDown();
-        } 
-        
-        else if (event.key.keysym.sym == SDLK_UP || event.key.keysym.sym == SDLK_SPACE) {
-            RotateTetromino();
-        } 
-        
     }
 }
 
 void SetUpGame() {
-    GameLoop = true;
-
     int RandomIndex = rand()%7;
     for (int i = 0; i < 4; i++) {
         Tetromino[i][0] = Tetrominos[RandomIndex][i][0];
         Tetromino[i][1] = Tetrominos[RandomIndex][i][1];
     }
 
-    for (int x = 0; x < 10; x++) {
-        for (int y = 0; y < 20; y++) {
-            TetrominoCoveredGrid[10][20] = false;
-        }
+    RandomIndex = rand()%7;
+    for (int i = 0; i < 4; i++) {
+        NextTetromino[i][0] = Tetrominos[RandomIndex][i][0];
+        NextTetromino[i][1] = Tetrominos[RandomIndex][i][1];
     }
 
     for (int i = 0; i < HORIZONTAL_GRID; i++) {
         for (int j = 0; j < VERTICAL_GRID; j++) {
-            SDL_Rect rect;
-            rect.x = (i * TILE);
-            rect.y = (j * TILE);
-            rect.w = TILE;
-            rect.h = TILE;
+            SDL_Rect rect = {(i * TILE), (j * TILE), TILE, TILE};
             Grid[i][j] = rect;
         }
     }
@@ -177,7 +191,7 @@ void ClearLine(int y_index) {
             TetrominoCoveredGrid[x][y] = TetrominoCoveredGrid[x][y-1];
         }
     }
-}void GetTetrominoDown();
+}
 
 
 bool CheckHorizontalBorder(int move) {
@@ -210,10 +224,15 @@ void UpdateGame() {
             TetrominoCoveredGrid[x][y] = true;
         }
 
+        for (int i = 0; i < 4; i++) {
+            Tetromino[i][0] = NextTetromino[i][0];
+            Tetromino[i][1] = NextTetromino[i][1];
+        }
+
         int RandomIndex = rand()%7;
         for (int i = 0; i < 4; i++) {
-            Tetromino[i][0] = Tetrominos[RandomIndex][i][0];
-            Tetromino[i][1] = Tetrominos[RandomIndex][i][1];
+            NextTetromino[i][0] = Tetrominos[RandomIndex][i][0];
+            NextTetromino[i][1] = Tetrominos[RandomIndex][i][1];
         }
 
         TetrominoCoord[0] =  5;
@@ -228,8 +247,15 @@ void UpdateGame() {
             }
                 
             if (TetrominoCoveredGrid[x][y]) {
-                if (x == 9) ClearLine(y);
-                else continue;
+                if (x == 9) {
+                    ClearLine(y);
+                    score += 100;
+                    scoreTextSurface = TTF_RenderText_Solid(font, ("SCORE - " + std::to_string(score)).c_str(), {255, 255, 255});
+                    scoreTextTexture = SDL_CreateTextureFromSurface(GameRenderer, scoreTextSurface);
+
+                    scoreTextRect = {320, 500, scoreTextSurface->w, scoreTextSurface->h};
+                    SDL_FreeSurface(scoreTextSurface);
+                } else continue;
             } else break;
         }
     }
