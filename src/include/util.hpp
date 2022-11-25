@@ -11,6 +11,4 @@ int TetrominoCoord[2] = {5, -2};
 bool GameLoop = true;;
 bool TetrominoCoveredGrid[10][20] = {false};
 
-
-
 #endif
