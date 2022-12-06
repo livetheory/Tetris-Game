@@ -1,7 +1,7 @@
 ## Getting Started
 
-Welcome to my repositry, Tetris-Clone written in c++ with SDL2, You can clone, compile and play this.
+Welcome to my repositry, Tetris-Clone written in c++ with Simple DirectMedia Layer (SDL), You can clone, compile and play this game.
 
 ## Dependencies
 
-SDL2 and SDL2-ttf
+SDL2, SDL2-ttf and SDL2-mixer

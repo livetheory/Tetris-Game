@@ -4,14 +4,8 @@ project(TetrisGame VERSION 0.1.0)
 include(CTest)
 enable_testing()
 
-add_executable(
-    TetrisGame 
-
-    src/main.cpp
-    src/game.cpp
-)
-
-target_link_libraries(${PROJECT_NAME} SDL2 SDL2_ttf)
+add_executable(TetrisGame src/main.cpp)
+target_link_libraries(${PROJECT_NAME} SDL2 SDL2_ttf SDL2_mixer)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
